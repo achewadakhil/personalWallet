@@ -1,201 +1,118 @@
-import { useMemo, useState } from "react";
-import {
-  Box,
-  Button,
-  Typography,
-  Paper,
-  Stack,
-  IconButton,
-  ThemeProvider,
-  createTheme,
-  CssBaseline,
-  Fade,
-} from "@mui/material";
-import { Brightness4, Brightness7 } from "@mui/icons-material";
+import { useEffect, useState } from "react";
 import * as bip39 from "bip39";
-import { Buffer } from "buffer";
-window.Buffer = Buffer;
+import { Buffer } from 'buffer';
+import { HDNodeWallet } from "ethers";
+import { Wallet } from "ethers";
 
-export default function App() {
-  const [mode, setMode] = useState<"light" | "dark">("dark");
-  const [showMnemonic, setShowMnemonic] = useState(false);
-  const [showMainPage, setShowMainPage] = useState(false);
-  const [mnemonic, setMnemonic] = useState("");
+import { Keypair } from "@solana/web3.js";
+import { derivePath } from "ed25519-hd-key";
+(window as any).Buffer = Buffer;
 
-  const theme = useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode,
-          background: {
-            default: mode === "dark" ? "#121212" : "#f5f5f5",
-          },
-        },
-        components: {
-          MuiCssBaseline: {
-            styleOverrides: {
-              body: {
-                transition: "background-color 0.5s ease, color 0.5s ease",
-              },
-              "#root": {
-                transition: "background-color 0.5s ease, color 0.5s ease",
-              },
-            },
-          },
-        },
-      }),
-    [mode]
-  );
+type ethWalletType = {
+  privateKey: string;
+  address: string;
+};
+type solWalletType = {
+  privateKey: string;
+  address: string;
+};
+export default  function App(){
+  const [mnemonics,setMnemonics] = useState<string>("");
+  const [seed,setSeed] = useState<Buffer | null>(null);
+  const [ethIdx,setEthIdx] = useState<number>(0);
+  const [solIdx,setSolIdx] = useState<number>(0);
+  const [root, setRoot] = useState<HDNodeWallet | null>(null);
+  const [ethWallet,setEthWallet] = useState<ethWalletType[]>([]);
+  const [solWallet,setSolWallet] = useState<solWalletType[]>([]);
 
-  const toggleTheme = () => {
-    setMode((prev) => (prev === "dark" ? "light" : "dark"));
+
+
+
+  async function createMnemonics(){
+    const mnemonics =  bip39.generateMnemonic();
+    setMnemonics(mnemonics);
+    const seed = await bip39.mnemonicToSeed(mnemonics);
+    console.log("Generated Seed: ", Buffer.from(seed).toString("base64"));
+    setSeed(seed);
+    setRoot(HDNodeWallet.fromSeed(seed));
+  }
+
+function createSolWallet() {
+  if (!seed) return alert("Please generate mnemonics first");
+
+  const soldir = `m/44'/501'/${solIdx}'/0'`; // all levels hardened
+  const derivedSeed = derivePath(soldir, seed.toString("hex")); // raw seed, not hex
+
+  const keyPair = Keypair.fromSeed(derivedSeed.key.slice(0, 32)); // use only 32 bytes
+
+  const newWallet: solWalletType = {
+    privateKey: Buffer.from(keyPair.secretKey).toString("base64"),
+    address: keyPair.publicKey.toBase58(),
   };
 
-  const handleCreateWallet = () => {
-    const newMnemonic = bip39.generateMnemonic();
-    console.log("Generated Mnemonic:", newMnemonic);
-    setMnemonic(newMnemonic);
-    setShowMnemonic(true);
-  };
+  console.log("Solana Wallet:", newWallet);
+  setSolWallet(prev => [...prev, newWallet]);
+  setSolIdx(prev => prev + 1);
+}
 
+
+
+  function createEthWallet(){
+    if(!root) return alert("Please generate mnemonics first");
+    const eth = `m/44'/60'/${ethIdx}'/0/0`;
+    const ethPath = root.derivePath(eth);
+    const ethChild = new Wallet(ethPath.privateKey);
+    const newPair : ethWalletType = {
+      privateKey: ethChild.privateKey,
+      address: ethChild.address,
+    };
+    console.log(newPair);
+    setEthWallet(prev => [...prev, newPair]);
+    setEthIdx(prev => prev + 1);
+  }
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box
-        sx={{
-          bgcolor: "background.default",
-          color: "text.primary",
-          height: "100vh",
-          width: "100vw",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          position: "relative",
-          transition: "background-color 0.5s ease, color 0.5s ease",
-        }}
-      >
-        {/* Toggle Theme Button */}
-        <IconButton
-          onClick={toggleTheme}
-          sx={{ position: "absolute", top: 16, right: 16 }}
-          color="inherit"
+    <div style = {{color : "#dcc3c3ff",textAlign:"center"  ,backgroundColor:"#000000", padding:"20px",height:"100vh"}}>
+      <h1 style={{color:"#dcc3c3ff"}}>My HD WALLET</h1>
+      <button style={{padding:"10px 20px", fontSize:"16px"}} onClick={createMnemonics}>Create mnemonics</button>
+      {mnemonics && (
+        <div style={{ marginTop: "20px" }}>
+        <h2>Generated Mnemonics:</h2>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "12px",
+            marginTop: "10px",
+            width : "80%",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto",
+          }}
         >
-          {mode === "dark" ? <Brightness7 /> : <Brightness4 />}
-        </IconButton>
-
-        {/* Fade between welcome screen and mnemonic */}
-        <Fade in={!showMnemonic && !showMainPage} timeout={500} unmountOnExit>
-          <Paper
-            elevation={6}
-            sx={{
-              p: 5,
-              minWidth: 300,
-              maxWidth: 400,
-              borderRadius: 3,
-              textAlign: "center",
-            }}
-          >
-            <Typography variant="h5" gutterBottom fontWeight={600}>
-              Welcome to HD Wallet
-            </Typography>
-
-            <Stack spacing={2} mt={3}>
-              <Button variant="contained" fullWidth onClick={handleCreateWallet}>
-                  Create Wallet
-                </Button>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                >
-                  Import via Mnemonic
-              </Button> 
-            </Stack>
-          </Paper>
-        </Fade>
-
-        {/* Mnemonic screen */}
-        <Fade in={showMnemonic} timeout={500} unmountOnExit>
-          <Paper
-            elevation={6}
-            sx={{
-              p: 5,
-              minWidth: 300,
-              maxWidth: 600,
-              borderRadius: 3,
-              textAlign: "center",
-              bgcolor: mode === "dark" ? "#1e1e1e" : "#ffffff",
-            }}
-          >
-            <Typography variant="h5" gutterBottom fontWeight={600}>
-              Your Mnemonic Phrase
-            </Typography>
-
-            {/* Mnemonic words arranged in 3 per row */}
-            <Box
-              mt={3}
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: 2,
-                bgcolor: mode === "dark" ? "#2c2c2c" : "#f0f0f0",
-                p: 2,
-                borderRadius: 2,
-                wordBreak: "break-word",
+          {mnemonics.split(" ").map((word, index) => (
+            <div
+              key={index}
+              style={{
+                padding: "8px",
+                border: "1px solid #ccc",
+                borderRadius: "8px",
+                backgroundColor: "#1a1a1a",
+                textAlign: "center",
+                fontWeight: "500",
+                color : "#ffffff",
               }}
             >
-              {mnemonic.split(" ").map((word, idx) => (
-                <Typography
-                  key={idx}
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "1rem",
-                    color: mode === "dark" ? "#ffffff" : "#000000",
-                  }}
-                >
-                  {idx + 1}. {word}
-                </Typography>
-              ))}
-            </Box>
-
-            <Button
-              variant="contained"
-              sx={{ mt: 4 }}
-              onClick={() => {
-                setShowMnemonic(false);
-                setShowMainPage(true);
-              }}
-            >
-              I have noted my mnemonic
-            </Button>
-
-          </Paper>
-        </Fade>
-        <Fade in={showMainPage} timeout={500} unmountOnExit>
-          <Paper
-            elevation={6}
-            sx={{
-              p: 5,
-              minWidth: 300,
-              maxWidth: 600,
-              borderRadius: 3,
-              textAlign: "center",
-              bgcolor: mode === "dark" ? "#1e1e1e" : "#ffffff",
-            }}
-          >
-            <Typography variant="h5" gutterBottom fontWeight={600}>
-              Your Accounts
-            </Typography>
-
-            <Stack spacing={2} mt={3}>
-              <Typography>Account 0 - Ethereum</Typography>
-              <Typography>Account 1 - Solana</Typography>
-              <Typography>Account 2 - Empty</Typography>
-              {/* You can replace this with actual derived accounts later */}
-            </Stack>
-          </Paper>
-        </Fade>
-
-      </Box>
-    </ThemeProvider>
-  );
+              <span style={{ marginRight: "6px", color: "#888" }}>{index + 1}.</span>
+              {word}
+            </div>
+          ))}
+          </div>
+        </div>
+      )}
+      <div style={{ margin: "20px 0px" , gap: "10px", display: "flex", justifyContent: "center", alignItems: "center" }}>
+        <button onClick={createEthWallet}>EthWallet</button>
+        <button onClick={createSolWallet}>SolWallet</button>
+      </div>
+    </div>
+  )
 }

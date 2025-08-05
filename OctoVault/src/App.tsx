@@ -6,7 +6,8 @@ import { Wallet } from "ethers";
 
 import { Keypair } from "@solana/web3.js";
 import { HDKey } from "@scure/bip32";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import MyWallet from "./components/MyWallet";
 (window as any).Buffer = Buffer;
 
 type ethWalletType = {
@@ -27,6 +28,8 @@ export default  function App(){
   const [solWallet,setSolWallet] = useState<solWalletType[]>([]);
 
   async function createMnemonics(){
+    ethWallet.length = 0;
+    solWallet.length = 0;
     const mnemonics =  bip39.generateMnemonic();
     setMnemonics(mnemonics);
     const seed = await bip39.mnemonicToSeed(mnemonics);
@@ -34,7 +37,7 @@ export default  function App(){
     setSeed(seed);
     setRoot(HDNodeWallet.fromSeed(seed));
   }
-//err
+
   function createSolWallet(){
     if(!seed) return alert("Please generate mnemonics first");
     const solPath = `m/44'/501'/${solIdx}'/0'`;
@@ -70,7 +73,7 @@ export default  function App(){
         textAlign:"center"  ,
         backgroundColor:"#000000", 
         padding:"20px",
-        height:"100vh"
+        minHeight:"100vh"
         }}
       >
         <div style={{ marginBottom: "20px" ,display: "flex", justifyContent: "center", alignItems: "center" ,borderBottom: "1px solid #ccc" }}>
@@ -85,7 +88,7 @@ export default  function App(){
             color:"#ffffff",
             border:"1px solid #ccc",
             borderRadius:"8px",
-          }}>Cick Here</button>
+          }}>Create new</button>
         </div>
         {mnemonics && (
           <div style={{border: "1px solid #ccc", padding: "20px", borderRadius: "8px", backgroundColor: "#000000ff" , width: "80%", margin: "0 auto" }}>
@@ -106,11 +109,9 @@ export default  function App(){
                   key={index}
                   style={{
                     padding: "8px",
-                    border: "1px solid #ccc",
-                    borderRadius: "8px",
-                    backgroundColor: "#000000ff",
                     textAlign: "center",
                     fontWeight: "500",
+                    fontSize: "20px",
                     color : "#ffffffff",
                   }}
                 >
@@ -121,9 +122,10 @@ export default  function App(){
             </div>
           </div>
         )}
-        {mnemonics && <div style={{ margin: "30px 0px", display: "flex", justifyContent: "space-around", alignItems: "center" }}>
-          <button onClick={createEthWallet}>EthWallet</button>
-          <button onClick={createSolWallet}>SolWallet</button>
+        {mnemonics && <div style={{ margin: "30px 0px", display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
+          <MyWallet wallets={ethWallet} creation={createEthWallet} type="eth" />
+          <br />
+          <MyWallet wallets={solWallet} creation={createSolWallet} type="sol" />
         </div>}
     </div>
   )
